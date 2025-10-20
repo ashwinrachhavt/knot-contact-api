@@ -1,0 +1,17 @@
+# Ignore virtual environments
+.venv/
+venv/
+
+# Ignore node modules
+node_modules/
+
+# Ignore build and cache
+__pycache__/
+dist/
+build/
+
+# Ignore environment files and logs
+.env
+*.log
+.venv
+node_modules
