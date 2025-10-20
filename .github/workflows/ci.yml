@@ -1,0 +1,94 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, feature-*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest-cov
+      
+      - name: Run migrations
+        working-directory: ./backend
+        env:
+          DJANGO_SETTINGS_MODULE: backend.settings
+        run: |
+          python manage.py migrate --noinput
+      
+      - name: Run unit tests
+        working-directory: ./backend
+        env:
+          DJANGO_SETTINGS_MODULE: backend.settings
+        run: |
+          pytest -m "unit" --tb=short -v
+      
+      - name: Run integration tests
+        working-directory: ./backend
+        env:
+          DJANGO_SETTINGS_MODULE: backend.settings
+        run: |
+          pytest -m "integration and not slow" --tb=short -v
+      
+      - name: Run all tests
+        working-directory: ./backend
+        env:
+          DJANGO_SETTINGS_MODULE: backend.settings
+        run: |
+          pytest -m "not slow" --tb=short -v
+
+  test-integration:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker images
+        run: docker-compose build
+      
+      - name: Start services
+        run: docker-compose up -d
+      
+      - name: Wait for backend to be ready
+        run: |
+          timeout 60 sh -c 'until curl -f http://localhost:8000/api/contacts/; do sleep 2; done'
+      
+      - name: Test API endpoints
+        run: |
+          echo "Testing GET contacts endpoint..."
+          curl -f http://localhost:8000/api/contacts/
+      
+      - name: Stop services
+        if: always()
+        run: docker-compose down -v

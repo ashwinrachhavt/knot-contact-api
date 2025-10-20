@@ -10,12 +10,23 @@ export type Contact = {
   updated_at: string;
 };
 
-export type ContactEvent = {
-  type: "contact.created" | "contact.updated" | "contact.deleted";
-  payload: unknown;
+export type ContactEvent =
+  | { type: "contact.created"; payload: Contact }
+  | { type: "contact.updated"; payload: Contact }
+  | { type: "contact.deleted"; payload: { id?: number; contact_id?: number } };
+
+export type ContactHistoryEntry = {
+  id: number;
+  contact: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  edited_at: string;
+  edited_reason?: string;
 };
 
-export const Contacts = {
+export const ContactsApi = {
   list: (params?: Record<string, unknown>) =>
     api.get<Contact[]>("/contacts/", { params }).then((response) => response.data),
   create: (body: Partial<Contact>) =>
@@ -23,10 +34,11 @@ export const Contacts = {
   update: (id: number, body: Partial<Contact>) =>
     api.patch<Contact>(`/contacts/${id}/`, body).then((response) => response.data),
   remove: (id: number) => api.delete(`/contacts/${id}/`).then((response) => response.data),
-  history: (id: number) => api.get(`/contacts/${id}/history/`).then((response) => response.data),
+  history: (id: number) =>
+    api.get<ContactHistoryEntry[]>(`/contacts/${id}/history/`).then((response) => response.data),
 };
 
-export const openContactsSocket = (): WebSocket => {
-  const base = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
+export const openContactsSocket = () => {
+  const base = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
   return new WebSocket(`${base}/ws/contacts/`);
 };
