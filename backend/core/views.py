@@ -56,13 +56,20 @@ class ContactViewSet(viewsets.ModelViewSet):
 
     def _broadcast(self, event_type: str, payload: dict):
         channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            "contacts",
-            {
-                "type": "contacts.event",
-                "event": {"type": event_type, "payload": payload},
-            },
-        )
+        if not channel_layer:
+            return
+
+        try:
+            async_to_sync(channel_layer.group_send)(
+                "contacts",
+                {
+                    "type": "contacts.event",
+                    "event": {"type": event_type, "payload": payload},
+                },
+            )
+        except Exception:  # pragma: no cover - fallback when channel layer unavailable
+            # Avoid blowing up API responses if realtime layer is temporarily unavailable.
+            pass
 
 
 @api_view(["POST"])
@@ -88,11 +95,15 @@ def external_update(request):
     )
     data = ContactSerializer(contact).data
     channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "contacts",
-        {
-            "type": "contacts.event",
-            "event": {"type": "contact.updated", "payload": data},
-        },
-    )
+    if channel_layer:
+        try:
+            async_to_sync(channel_layer.group_send)(
+                "contacts",
+                {
+                    "type": "contacts.event",
+                    "event": {"type": "contact.updated", "payload": data},
+                },
+            )
+        except Exception:  # pragma: no cover
+            pass
     return Response(data, status=status.HTTP_200_OK)

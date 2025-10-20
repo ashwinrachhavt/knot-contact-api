@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -88,12 +89,37 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
 }
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [("redis", 6379)]},
+from typing import Any
+
+
+def _channel_layer_config() -> dict[str, Any]:
+    redis_url = os.environ.get("REDIS_URL")
+
+    if not redis_url or redis_url in {"memory", "inmemory", "local"}:
+        return {
+            "default": {
+                "BACKEND": "channels.layers.InMemoryChannelLayer",
+            }
+        }
+
+    try:
+        import channels_redis  # noqa: F401
+    except ImportError:
+        return {
+            "default": {
+                "BACKEND": "channels.layers.InMemoryChannelLayer",
+            }
+        }
+
+    return {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [redis_url]},
+        }
     }
-}
+
+
+CHANNEL_LAYERS = _channel_layer_config()
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

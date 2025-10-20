@@ -26,9 +26,18 @@ export type ContactHistoryEntry = {
   edited_reason?: string;
 };
 
+type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
 export const ContactsApi = {
   list: (params?: Record<string, unknown>) =>
-    api.get<Contact[]>("/contacts/", { params }).then((response) => response.data),
+    api
+      .get<PaginatedResponse<Contact>>("/contacts/", { params })
+      .then((response) => response.data.results),
   create: (body: Partial<Contact>) =>
     api.post<Contact>("/contacts/", body).then((response) => response.data),
   update: (id: number, body: Partial<Contact>) =>
